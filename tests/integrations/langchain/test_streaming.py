@@ -23,6 +23,7 @@ from nemoguardrails import RailsConfig
 from nemoguardrails.actions import action
 from nemoguardrails.exceptions import StreamingNotSupportedError
 from nemoguardrails.streaming import StreamingHandler
+from nemoguardrails.testing.fake_model import FakeLLMModel
 from tests.utils import TestChat
 
 
@@ -397,7 +398,22 @@ async def test_streaming_output_rails_preserve_custom_task():
                     },
                 }
             },
-            "prompts": [{"task": "check_data_leakage", "content": "a test template"}],
+            "prompts": [
+                {
+                    "task": "check_data_leakage",
+                    "content": """
+                    Bot response: {{ bot_response }}
+                    Answer No.
+                    """,
+                },
+                {
+                    "task": "self_check_output",
+                    "content": """
+                    Bot response: {{ bot_response }}
+                    Answer Yes.
+                    """,
+                },
+            ],
         },
         colang_content="""
         define user express greeting
@@ -408,12 +424,8 @@ async def test_streaming_output_rails_preserve_custom_task():
           bot tell joke
         """,
     )
-    seen_tasks = []
-
-    @action(is_system_action=True, output_mapping=lambda result: not result)
-    def capture_self_check_output(**params):
-        seen_tasks.append(params["task"])
-        return True
+    custom_llm = FakeLLMModel(responses=["No", "No"])
+    default_llm = FakeLLMModel(responses=["Yes"])
 
     chat = TestChat(
         config,
@@ -423,7 +435,8 @@ async def test_streaming_output_rails_preserve_custom_task():
         ],
         streaming=True,
     )
-    chat.app.register_action(capture_self_check_output, name="self_check_output")
+    chat.app.runtime.registered_action_params["llms"]["check_data_leakage"] = custom_llm
+    chat.app.runtime.registered_action_params["llms"]["self_check_output"] = default_llm
 
     chunks = []
     async for chunk in chat.app.stream_async(
@@ -432,8 +445,8 @@ async def test_streaming_output_rails_preserve_custom_task():
         chunks.append(chunk)
 
     assert "".join(chunks) == "This response should stream safely."
-    assert seen_tasks
-    assert set(seen_tasks) == {"check_data_leakage"}
+    assert custom_llm.inference_count > 0
+    assert default_llm.inference_count == 0
 
     await asyncio.gather(*asyncio.all_tasks() - {asyncio.current_task()})
 
