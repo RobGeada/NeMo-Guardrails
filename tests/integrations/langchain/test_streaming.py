@@ -382,6 +382,63 @@ async def test_sequential_streaming_output_rails_allowed(
 
 
 @pytest.mark.asyncio
+async def test_streaming_output_rails_preserve_custom_task():
+    config = RailsConfig.from_content(
+        config={
+            "models": [],
+            "rails": {
+                "output": {
+                    "flows": ["self check output $output_task=check_data_leakage"],
+                    "streaming": {
+                        "enabled": True,
+                        "chunk_size": 4,
+                        "context_size": 2,
+                        "stream_first": False,
+                    },
+                }
+            },
+            "prompts": [{"task": "check_data_leakage", "content": "a test template"}],
+        },
+        colang_content="""
+        define user express greeting
+          "hi"
+
+        define flow
+          user express greeting
+          bot tell joke
+        """,
+    )
+    seen_tasks = []
+
+    @action(is_system_action=True, output_mapping=lambda result: not result)
+    def capture_self_check_output(**params):
+        seen_tasks.append(params["task"])
+        return True
+
+    chat = TestChat(
+        config,
+        llm_completions=[
+            '  express greeting\nbot express greeting\n  "Hi, how are you doing?"',
+            '  "This response should stream safely."',
+        ],
+        streaming=True,
+    )
+    chat.app.register_action(capture_self_check_output, name="self_check_output")
+
+    chunks = []
+    async for chunk in chat.app.stream_async(
+        messages=[{"role": "user", "content": "Hi!"}],
+    ):
+        chunks.append(chunk)
+
+    assert "".join(chunks) == "This response should stream safely."
+    assert seen_tasks
+    assert set(seen_tasks) == {"check_data_leakage"}
+
+    await asyncio.gather(*asyncio.all_tasks() - {asyncio.current_task()})
+
+
+@pytest.mark.asyncio
 async def test_streaming_output_rails_blocked(output_rails_streaming_config):
     """This test checks if the streaming output rails block the completions when a BLOCK keyword is present.
     It verifies that the chunks contain the stop data when the BLOCK keyword is detected.
