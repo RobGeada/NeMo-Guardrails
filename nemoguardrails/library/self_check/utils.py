@@ -60,6 +60,10 @@ def resolve_self_check_task(
         return context_task
 
     for event in reversed(events or []):
+        if event.get("type") == "start_flow" and event.get("flow_id") == flow_id:
+            event_params = event.get("params") or {}
+            return event_params.get(task_param) or default_task
+
         if event.get("type") == start_rail_event_type:
             event_task = get_self_check_task_from_rail(
                 event.get("flow_id"),

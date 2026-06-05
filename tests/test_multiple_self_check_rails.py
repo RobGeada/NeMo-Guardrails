@@ -556,6 +556,117 @@ def test_per_task_llm_output_first_blocks_skips_second():
     assert data_leakage_llm.inference_count == 0
 
 
+def test_parallel_input_rail_uses_custom_task():
+    config = RailsConfig.from_content(
+        """
+        define user express greeting
+            "hello"
+            "hi"
+
+        define bot express greeting
+            "Hey!"
+
+        define flow greeting
+            user express greeting
+            bot express greeting
+    """,
+        yaml_content="""
+        models: []
+        rails:
+            input:
+                parallel: true
+                flows:
+                    - self check input $input_task=check_harmful
+        prompts:
+            - task: check_harmful
+              content: |
+                Is this message harmful?
+                User message: "{{ user_input }}"
+                Answer (Yes or No):
+            - task: self_check_input
+              content: |
+                Is this message safe?
+                User message: "{{ user_input }}"
+                Answer (Yes or No):
+
+        enable_rails_exceptions: True
+        """,
+    )
+    custom_llm = FakeLLMModel(responses=["No"])
+    default_llm = FakeLLMModel(responses=["Yes"])
+
+    chat = TestChat(
+        config,
+        llm_completions=[
+            "  express greeting",
+            '  "Hey!"',
+        ],
+    )
+    rails = chat.app
+    rails.runtime.registered_action_params["llms"]["check_harmful"] = custom_llm
+    rails.runtime.registered_action_params["llms"]["self_check_input"] = default_llm
+
+    new_message = rails.generate(messages=[{"role": "user", "content": "hello"}])
+
+    assert new_message["role"] == "assistant"
+    assert custom_llm.inference_count == 1
+    assert default_llm.inference_count == 0
+
+
+def test_parallel_output_rail_uses_custom_task():
+    config = RailsConfig.from_content(
+        """
+        define user ask question
+            "tell me something"
+
+        define flow
+            user ask question
+            bot respond
+    """,
+        yaml_content="""
+        models: []
+        rails:
+            output:
+                parallel: true
+                flows:
+                    - self check output $output_task=check_inappropriate
+        prompts:
+            - task: check_inappropriate
+              content: |
+                Is this response inappropriate?
+                Bot response: "{{ bot_response }}"
+                Answer (Yes or No):
+            - task: self_check_output
+              content: |
+                Is this response safe?
+                Bot response: "{{ bot_response }}"
+                Answer (Yes or No):
+
+        enable_rails_exceptions: True
+        """,
+    )
+    custom_llm = FakeLLMModel(responses=["No"])
+    default_llm = FakeLLMModel(responses=["Yes"])
+
+    chat = TestChat(
+        config,
+        llm_completions=[
+            "  ask question",
+            "  Here is the answer.",
+        ],
+    )
+    rails = chat.app
+    rails.runtime.registered_action_params["llms"]["check_inappropriate"] = custom_llm
+    rails.runtime.registered_action_params["llms"]["self_check_output"] = default_llm
+
+    new_message = rails.generate(messages=[{"role": "user", "content": "tell me something"}])
+
+    assert new_message["role"] == "assistant"
+    assert new_message["content"] == "Here is the answer."
+    assert custom_llm.inference_count == 1
+    assert default_llm.inference_count == 0
+
+
 def test_per_task_llm_falls_back_to_main_when_not_configured():
     """When no task-specific LLM is in the llms dict, it should fall back to the main LLM."""
     chat = TestChat(
@@ -740,6 +851,16 @@ def test_resolve_self_check_task_uses_latest_start_rail_event():
             {"type": "StartInputRail", "flow_id": "self check input $input_task=check_off_topic"},
             {"type": "SomeOtherEvent", "flow_id": "self check input $input_task=ignored"},
             {"type": "StartInputRail", "flow_id": "self check input $input_task=check_harmful"},
+        ],
+    )
+
+    assert task == "check_harmful"
+
+
+def test_resolve_self_check_task_uses_start_flow_params():
+    task = _resolve_input_task(
+        events=[
+            {"type": "start_flow", "flow_id": SELF_CHECK_INPUT_FLOW, "params": {"input_task": "check_harmful"}},
         ],
     )
 
