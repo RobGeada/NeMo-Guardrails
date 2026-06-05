@@ -14,38 +14,27 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from nemoguardrails import RailsConfig
 from nemoguardrails.actions import action
 from nemoguardrails.actions.llm.utils import llm_call, warn_if_truncated
 from nemoguardrails.context import llm_call_info_var
+from nemoguardrails.library.self_check.utils import (
+    SELF_CHECK_OUTPUT_DEFAULT_TASK,
+    SELF_CHECK_OUTPUT_FLOW,
+    SELF_CHECK_OUTPUT_TASK_PARAM,
+    get_self_check_llm,
+    parse_self_check_output,
+    resolve_self_check_task,
+)
 from nemoguardrails.llm.taskmanager import LLMTaskManager
 from nemoguardrails.logging.explain import LLMCallInfo
 from nemoguardrails.types import LLMModel
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TASK = "self_check_output"
-
-
-def _get_llm(
-    llms: Dict[str, LLMModel], task: str, default_task: str, default_llm: Optional[LLMModel]
-) -> Optional[LLMModel]:
-    if task in llms:
-        return llms[task]
-    elif default_task in llms:
-        log.debug(f"No model found with type={task}, falling back to default {default_task} model")
-        return llms[default_task]
-    elif default_llm is not None:
-        log.debug(f"No model found with type={task} or type={default_task}, falling back to main model")
-        return default_llm
-    else:
-        error_msg = (
-            f"No matching model for task={task} found. "
-            f"Please configure a model with type={task}, type={default_task}, or type=main"
-        )
-        raise ValueError(error_msg)
+DEFAULT_TASK = SELF_CHECK_OUTPUT_DEFAULT_TASK
 
 
 @action(is_system_action=True, output_mapping=lambda value: not value)
@@ -53,9 +42,10 @@ async def self_check_output(
     llms: Dict[str, LLMModel],
     llm_task_manager: LLMTaskManager,
     context: Optional[dict] = None,
+    events: Optional[List[dict]] = None,
     llm: Optional[LLMModel] = None,
     config: Optional[RailsConfig] = None,
-    task: str = DEFAULT_TASK,
+    task: Optional[str] = None,
     **kwargs,
 ):
     """Checks if the output from the bot.
@@ -71,15 +61,23 @@ async def self_check_output(
     """
 
     _MAX_TOKENS = 1024
+    context = context or {}
     bot_response = context.get("bot_message")
     user_input = context.get("user_message")
     bot_thinking = context.get("bot_thinking")
 
-    # guard against an unset $task variable
-    if task.startswith("$") and task.endswith("_task"):
-        task = DEFAULT_TASK
+    task = resolve_self_check_task(
+        task,
+        context,
+        events,
+        triggered_rail_key="triggered_output_rail",
+        start_rail_event_type="StartOutputRail",
+        flow_id=SELF_CHECK_OUTPUT_FLOW,
+        task_param=SELF_CHECK_OUTPUT_TASK_PARAM,
+        default_task=DEFAULT_TASK,
+    )
 
-    llm = _get_llm(llms, task, default_task=DEFAULT_TASK, default_llm=llm)
+    llm = get_self_check_llm(llms, task, default_task=DEFAULT_TASK, main_llm=llm)
 
     if bot_response:
         prompt = llm_task_manager.render_task_prompt(
@@ -114,12 +112,7 @@ async def self_check_output(
         else:
             log.info(f"Output self-checking result for task={task} is: `{response}`.")
 
-        # for sake of backward compatibility
-        # if the output_parser is not registered we will use the default one
-        if llm_task_manager.has_output_parser(task):
-            result = llm_task_manager.parse_task_output(task, output=response)
-        else:
-            result = llm_task_manager.parse_task_output(task, output=response, forced_output_parser="is_content_safe")
+        result = parse_self_check_output(llm_task_manager, task, response)
 
         is_safe = result[0]
 

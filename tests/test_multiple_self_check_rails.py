@@ -18,6 +18,14 @@
 import pytest
 
 from nemoguardrails import RailsConfig
+from nemoguardrails.library.self_check.utils import (
+    SELF_CHECK_INPUT_DEFAULT_TASK,
+    SELF_CHECK_INPUT_FLOW,
+    SELF_CHECK_INPUT_TASK_PARAM,
+    get_self_check_llm,
+    get_self_check_task_from_rail,
+    resolve_self_check_task,
+)
 from nemoguardrails.testing.fake_model import FakeLLMModel
 from tests.utils import TestChat
 
@@ -662,18 +670,96 @@ def test_output_fallback_chain_prefers_task_over_default():
     assert chat.llm.inference_count == 2
 
 
-def test_input_no_model_raises_error():
-    """When no model is available at any fallback level, _get_llm raises ValueError."""
-    from nemoguardrails.library.self_check.input_check.actions import _get_llm
+def _resolve_input_task(task=None, context=None, events=None):
+    return resolve_self_check_task(
+        task,
+        context,
+        events,
+        triggered_rail_key="triggered_input_rail",
+        start_rail_event_type="StartInputRail",
+        flow_id=SELF_CHECK_INPUT_FLOW,
+        task_param=SELF_CHECK_INPUT_TASK_PARAM,
+        default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
+    )
 
+
+def test_get_self_check_task_from_rail_resolves_custom_and_default_tasks():
+    assert (
+        get_self_check_task_from_rail(
+            "self check input $input_task=check_harmful",
+            flow_id=SELF_CHECK_INPUT_FLOW,
+            task_param=SELF_CHECK_INPUT_TASK_PARAM,
+            default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
+        )
+        == "check_harmful"
+    )
+
+    assert (
+        get_self_check_task_from_rail(
+            "self check input",
+            flow_id=SELF_CHECK_INPUT_FLOW,
+            task_param=SELF_CHECK_INPUT_TASK_PARAM,
+            default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
+        )
+        == SELF_CHECK_INPUT_DEFAULT_TASK
+    )
+
+    assert (
+        get_self_check_task_from_rail(
+            "self check output $output_task=check_inappropriate",
+            flow_id=SELF_CHECK_INPUT_FLOW,
+            task_param=SELF_CHECK_INPUT_TASK_PARAM,
+            default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
+        )
+        is None
+    )
+
+
+def test_resolve_self_check_task_prefers_explicit_task():
+    task = _resolve_input_task(
+        task="check_harmful",
+        context={"triggered_input_rail": "self check input $input_task=check_off_topic"},
+    )
+
+    assert task == "check_harmful"
+
+
+def test_resolve_self_check_task_uses_triggered_rail_context():
+    task = _resolve_input_task(
+        task="$input_task",
+        context={"triggered_input_rail": "self check input $input_task=check_harmful"},
+    )
+
+    assert task == "check_harmful"
+
+
+def test_resolve_self_check_task_uses_latest_start_rail_event():
+    task = _resolve_input_task(
+        task="$input_task",
+        events=[
+            {"type": "StartInputRail", "flow_id": "self check input $input_task=check_off_topic"},
+            {"type": "SomeOtherEvent", "flow_id": "self check input $input_task=ignored"},
+            {"type": "StartInputRail", "flow_id": "self check input $input_task=check_harmful"},
+        ],
+    )
+
+    assert task == "check_harmful"
+
+
+def test_resolve_self_check_task_defaults_unresolved_placeholders():
+    assert _resolve_input_task(context={"triggered_input_rail": "self check input"}) == SELF_CHECK_INPUT_DEFAULT_TASK
+    assert _resolve_input_task(task="$input_task") == SELF_CHECK_INPUT_DEFAULT_TASK
+    assert _resolve_input_task() == SELF_CHECK_INPUT_DEFAULT_TASK
+
+
+def test_input_no_model_raises_error():
+    """When no model is available at any fallback level, get_self_check_llm raises ValueError."""
     with pytest.raises(ValueError, match="No matching model"):
-        _get_llm({}, "check_harmful", "self_check_input", default_llm=None)
+        get_self_check_llm({}, "check_harmful", "self_check_input", main_llm=None)
 
 
 def test_get_llm_fallback_chain():
-    """_get_llm resolves models in order: task -> default_task -> main -> ValueError."""
-    from nemoguardrails.library.self_check.input_check.actions import _get_llm
-
+    """get_self_check_llm resolves models in order: task -> default_task -> main -> ValueError."""
     task_llm = FakeLLMModel(responses=[])
     default_llm = FakeLLMModel(responses=[])
     main_llm = FakeLLMModel(responses=[])
@@ -684,17 +770,17 @@ def test_get_llm_fallback_chain():
     }
 
     # Level 1: exact task match
-    assert _get_llm(all_llms, "check_harmful", "self_check_input", default_llm=main_llm) is task_llm
+    assert get_self_check_llm(all_llms, "check_harmful", "self_check_input", main_llm=main_llm) is task_llm
 
     # Level 2: fall back to default task
-    assert _get_llm(all_llms, "check_off_topic", "self_check_input", default_llm=main_llm) is default_llm
+    assert get_self_check_llm(all_llms, "check_off_topic", "self_check_input", main_llm=main_llm) is default_llm
 
     # Level 3: fall back to default_llm (the llm action param)
-    assert _get_llm({}, "check_harmful", "self_check_input", default_llm=main_llm) is main_llm
+    assert get_self_check_llm({}, "check_harmful", "self_check_input", main_llm=main_llm) is main_llm
 
     # Level 4: no model raises ValueError
     with pytest.raises(ValueError, match="No matching model"):
-        _get_llm({}, "check_harmful", "self_check_input", default_llm=None)
+        get_self_check_llm({}, "check_harmful", "self_check_input", main_llm=None)
 
     with pytest.raises(ValueError, match="No matching model"):
-        _get_llm({}, "check_inappropriate", "self_check_output", default_llm=None)
+        get_self_check_llm({}, "check_inappropriate", "self_check_output", main_llm=None)
