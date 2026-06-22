@@ -16,7 +16,10 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from nemoguardrails.actions.llm.utils import llm_call, warn_if_truncated
 from nemoguardrails.colang.v1_0.runtime.flows import _get_flow_params, _normalize_flow_id
+from nemoguardrails.context import llm_call_info_var
+from nemoguardrails.logging.explain import LLMCallInfo
 from nemoguardrails.types import LLMModel
 
 log = logging.getLogger(__name__)
@@ -108,3 +111,40 @@ def parse_self_check_output(llm_task_manager: Any, task: str, response: str):
         return llm_task_manager.parse_task_output(task, output=response)
 
     return llm_task_manager.parse_task_output(task, output=response, forced_output_parser="is_content_safe")
+
+
+async def run_self_check_task(
+    task: str,
+    prompt_context: Dict[str, Any],
+    llms: Dict[str, LLMModel],
+    default_task: str,
+    main_llm: Optional[LLMModel],
+    llm_task_manager: Any,
+    lowest_temperature: float,
+    max_tokens: int = 1024,
+) -> tuple[bool, str]:
+    llm = get_self_check_llm(llms, task, default_task=default_task, main_llm=main_llm)
+
+    prompt = llm_task_manager.render_task_prompt(
+        task=task,
+        context=prompt_context,
+    )
+    stop = llm_task_manager.get_stop_tokens(task=task)
+    task_max_tokens = llm_task_manager.get_max_tokens(task=task) or max_tokens
+
+    llm_call_info_var.set(LLMCallInfo(task=task))
+
+    llm_response = await llm_call(
+        llm,
+        prompt,
+        stop=stop,
+        llm_params={
+            "temperature": lowest_temperature,
+            "max_tokens": task_max_tokens,
+        },
+    )
+    warn_if_truncated(llm_response, task)
+    response = llm_response.content
+
+    result = parse_self_check_output(llm_task_manager, task, response)
+    return bool(result[0]), response

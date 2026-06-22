@@ -25,7 +25,9 @@ from nemoguardrails.library.self_check.utils import (
     get_self_check_llm,
     get_self_check_task_from_rail,
     resolve_self_check_task,
+    run_self_check_task,
 )
+from nemoguardrails.llm.taskmanager import LLMTaskManager
 from nemoguardrails.testing.fake_model import FakeLLMModel
 from tests.utils import TestChat
 
@@ -792,6 +794,30 @@ def _resolve_input_task(task=None, context=None, events=None):
         task_param=SELF_CHECK_INPUT_TASK_PARAM,
         default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
     )
+
+
+@pytest.mark.asyncio
+async def test_run_self_check_task_uses_concrete_task_without_runtime_context():
+    task_llm = FakeLLMModel(responses=["No"])
+    default_llm = FakeLLMModel(responses=["Yes"])
+
+    is_safe, response = await run_self_check_task(
+        task="check_harmful",
+        prompt_context={"user_input": "hello"},
+        llms={
+            "check_harmful": task_llm,
+            "self_check_input": default_llm,
+        },
+        default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
+        main_llm=None,
+        llm_task_manager=LLMTaskManager(per_task_input_config),
+        lowest_temperature=per_task_input_config.lowest_temperature,
+    )
+
+    assert is_safe
+    assert response == "No"
+    assert task_llm.inference_count == 1
+    assert default_llm.inference_count == 0
 
 
 def test_get_self_check_task_from_rail_resolves_custom_and_default_tasks():

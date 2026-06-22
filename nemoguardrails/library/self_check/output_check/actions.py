@@ -18,18 +18,14 @@ from typing import Dict, List, Optional
 
 from nemoguardrails import RailsConfig
 from nemoguardrails.actions import action
-from nemoguardrails.actions.llm.utils import llm_call, warn_if_truncated
-from nemoguardrails.context import llm_call_info_var
 from nemoguardrails.library.self_check.utils import (
     SELF_CHECK_OUTPUT_DEFAULT_TASK,
     SELF_CHECK_OUTPUT_FLOW,
     SELF_CHECK_OUTPUT_TASK_PARAM,
-    get_self_check_llm,
-    parse_self_check_output,
     resolve_self_check_task,
+    run_self_check_task,
 )
 from nemoguardrails.llm.taskmanager import LLMTaskManager
-from nemoguardrails.logging.explain import LLMCallInfo
 from nemoguardrails.types import LLMModel
 
 log = logging.getLogger(__name__)
@@ -60,7 +56,6 @@ async def self_check_output(
         True if the output should be allowed, False otherwise.
     """
 
-    _MAX_TOKENS = 1024
     context = context or {}
     bot_response = context.get("bot_message")
     user_input = context.get("user_message")
@@ -77,43 +72,24 @@ async def self_check_output(
         default_task=DEFAULT_TASK,
     )
 
-    llm = get_self_check_llm(llms, task, default_task=DEFAULT_TASK, main_llm=llm)
-
     if bot_response:
-        prompt = llm_task_manager.render_task_prompt(
+        is_safe, response = await run_self_check_task(
             task=task,
-            context={
+            prompt_context={
                 "user_input": user_input,
                 "bot_response": bot_response,
                 "bot_thinking": bot_thinking,
             },
+            llms=llms,
+            default_task=DEFAULT_TASK,
+            main_llm=llm,
+            llm_task_manager=llm_task_manager,
+            lowest_temperature=config.lowest_temperature,
         )
-        stop = llm_task_manager.get_stop_tokens(task=task)
-        max_tokens = llm_task_manager.get_max_tokens(task=task)
-        max_tokens = max_tokens or _MAX_TOKENS
-
-        # Initialize the LLMCallInfo object
-        llm_call_info_var.set(LLMCallInfo(task=task))
-
-        llm_response = await llm_call(
-            llm,
-            prompt,
-            stop=stop,
-            llm_params={
-                "temperature": config.lowest_temperature,
-                "max_tokens": max_tokens,
-            },
-        )
-        warn_if_truncated(llm_response, task)
-        response = llm_response.content
 
         if task == DEFAULT_TASK:
             log.info(f"Output self-checking result is: `{response}`.")
         else:
             log.info(f"Output self-checking result for task={task} is: `{response}`.")
-
-        result = parse_self_check_output(llm_task_manager, task, response)
-
-        is_safe = result[0]
 
         return is_safe
