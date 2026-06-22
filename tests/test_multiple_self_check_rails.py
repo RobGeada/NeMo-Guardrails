@@ -51,8 +51,8 @@ multi_input_config = RailsConfig.from_content(
     rails:
         input:
             flows:
-                - self check input $input_task=check_harmful
-                - self check input $input_task=check_off_topic
+                - self check input $task=check_harmful
+                - self check input $task=check_off_topic
     prompts:
         - task: check_harmful
           content: |
@@ -137,8 +137,8 @@ multi_output_config = RailsConfig.from_content(
     rails:
         output:
             flows:
-                - self check output $output_task=check_inappropriate
-                - self check output $output_task=check_data_leakage
+                - self check output $task=check_inappropriate
+                - self check output $task=check_data_leakage
     prompts:
         - task: check_inappropriate
           content: |
@@ -244,7 +244,7 @@ default_task_config = RailsConfig.from_content(
 
 
 def test_default_task_input_still_works():
-    """Self check input without $input_task should use default self_check_input task."""
+    """Self check input without $task should use default self_check_input task."""
     chat = TestChat(
         default_task_config,
         llm_completions=[
@@ -278,7 +278,7 @@ def test_mixed_input_rails_run_custom_and_default_tasks():
         rails:
             input:
                 flows:
-                    - self check input $input_task=check_harmful
+                    - self check input $task=check_harmful
                     - self check input
         prompts:
             - task: check_harmful
@@ -318,7 +318,7 @@ def test_mixed_input_rails_run_custom_and_default_tasks():
 
 
 def test_default_task_output_still_works():
-    """Self check output without $output_task should use default self_check_output task."""
+    """Self check output without $task should use default self_check_output task."""
     chat = TestChat(
         default_task_config,
         llm_completions=[
@@ -351,7 +351,7 @@ def test_mixed_output_rails_run_custom_and_default_tasks():
         rails:
             output:
                 flows:
-                    - self check output $output_task=check_inappropriate
+                    - self check output $task=check_inappropriate
                     - self check output
         prompts:
             - task: check_inappropriate
@@ -410,8 +410,8 @@ per_task_input_config = RailsConfig.from_content(
     rails:
         input:
             flows:
-                - self check input $input_task=check_harmful
-                - self check input $input_task=check_off_topic
+                - self check input $task=check_harmful
+                - self check input $task=check_off_topic
     prompts:
         - task: check_harmful
           content: |
@@ -489,8 +489,8 @@ per_task_output_config = RailsConfig.from_content(
     rails:
         output:
             flows:
-                - self check output $output_task=check_inappropriate
-                - self check output $output_task=check_data_leakage
+                - self check output $task=check_inappropriate
+                - self check output $task=check_data_leakage
     prompts:
         - task: check_inappropriate
           content: |
@@ -578,7 +578,7 @@ def test_parallel_input_rail_uses_custom_task():
             input:
                 parallel: true
                 flows:
-                    - self check input $input_task=check_harmful
+                    - self check input $task=check_harmful
         prompts:
             - task: check_harmful
               content: |
@@ -631,7 +631,7 @@ def test_parallel_output_rail_uses_custom_task():
             output:
                 parallel: true
                 flows:
-                    - self check output $output_task=check_inappropriate
+                    - self check output $task=check_inappropriate
         prompts:
             - task: check_inappropriate
               content: |
@@ -823,7 +823,7 @@ async def test_run_self_check_task_uses_concrete_task_without_runtime_context():
 def test_get_self_check_task_from_rail_resolves_custom_and_default_tasks():
     assert (
         get_self_check_task_from_rail(
-            "self check input $input_task=check_harmful",
+            "self check input $task=check_harmful",
             flow_id=SELF_CHECK_INPUT_FLOW,
             task_param=SELF_CHECK_INPUT_TASK_PARAM,
             default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
@@ -843,7 +843,7 @@ def test_get_self_check_task_from_rail_resolves_custom_and_default_tasks():
 
     assert (
         get_self_check_task_from_rail(
-            "self check output $output_task=check_inappropriate",
+            "self check output $task=check_inappropriate",
             flow_id=SELF_CHECK_INPUT_FLOW,
             task_param=SELF_CHECK_INPUT_TASK_PARAM,
             default_task=SELF_CHECK_INPUT_DEFAULT_TASK,
@@ -855,7 +855,7 @@ def test_get_self_check_task_from_rail_resolves_custom_and_default_tasks():
 def test_resolve_self_check_task_prefers_explicit_task():
     task = _resolve_input_task(
         task="check_harmful",
-        context={"triggered_input_rail": "self check input $input_task=check_off_topic"},
+        context={"triggered_input_rail": "self check input $task=check_off_topic"},
     )
 
     assert task == "check_harmful"
@@ -863,8 +863,8 @@ def test_resolve_self_check_task_prefers_explicit_task():
 
 def test_resolve_self_check_task_uses_triggered_rail_context():
     task = _resolve_input_task(
-        task="$input_task",
-        context={"triggered_input_rail": "self check input $input_task=check_harmful"},
+        task="$task",
+        context={"triggered_input_rail": "self check input $task=check_harmful"},
     )
 
     assert task == "check_harmful"
@@ -872,11 +872,11 @@ def test_resolve_self_check_task_uses_triggered_rail_context():
 
 def test_resolve_self_check_task_uses_latest_start_rail_event():
     task = _resolve_input_task(
-        task="$input_task",
+        task="$task",
         events=[
-            {"type": "StartInputRail", "flow_id": "self check input $input_task=check_off_topic"},
-            {"type": "SomeOtherEvent", "flow_id": "self check input $input_task=ignored"},
-            {"type": "StartInputRail", "flow_id": "self check input $input_task=check_harmful"},
+            {"type": "StartInputRail", "flow_id": "self check input $task=check_off_topic"},
+            {"type": "SomeOtherEvent", "flow_id": "self check input $task=ignored"},
+            {"type": "StartInputRail", "flow_id": "self check input $task=check_harmful"},
         ],
     )
 
@@ -886,7 +886,7 @@ def test_resolve_self_check_task_uses_latest_start_rail_event():
 def test_resolve_self_check_task_uses_start_flow_params():
     task = _resolve_input_task(
         events=[
-            {"type": "start_flow", "flow_id": SELF_CHECK_INPUT_FLOW, "params": {"input_task": "check_harmful"}},
+            {"type": "start_flow", "flow_id": SELF_CHECK_INPUT_FLOW, "params": {"task": "check_harmful"}},
         ],
     )
 
@@ -895,7 +895,7 @@ def test_resolve_self_check_task_uses_start_flow_params():
 
 def test_resolve_self_check_task_defaults_unresolved_placeholders():
     assert _resolve_input_task(context={"triggered_input_rail": "self check input"}) == SELF_CHECK_INPUT_DEFAULT_TASK
-    assert _resolve_input_task(task="$input_task") == SELF_CHECK_INPUT_DEFAULT_TASK
+    assert _resolve_input_task(task="$task") == SELF_CHECK_INPUT_DEFAULT_TASK
     assert _resolve_input_task() == SELF_CHECK_INPUT_DEFAULT_TASK
 
 

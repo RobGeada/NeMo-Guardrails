@@ -26,8 +26,8 @@ log = logging.getLogger(__name__)
 
 SELF_CHECK_INPUT_FLOW = "self check input"
 SELF_CHECK_OUTPUT_FLOW = "self check output"
-SELF_CHECK_INPUT_TASK_PARAM = "input_task"
-SELF_CHECK_OUTPUT_TASK_PARAM = "output_task"
+SELF_CHECK_INPUT_TASK_PARAM = "task"
+SELF_CHECK_OUTPUT_TASK_PARAM = "task"
 SELF_CHECK_INPUT_DEFAULT_TASK = "self_check_input"
 SELF_CHECK_OUTPUT_DEFAULT_TASK = "self_check_output"
 

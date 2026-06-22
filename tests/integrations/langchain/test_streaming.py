@@ -389,7 +389,7 @@ async def test_streaming_output_rails_preserve_custom_task():
             "models": [],
             "rails": {
                 "output": {
-                    "flows": ["self check output $output_task=check_data_leakage"],
+                    "flows": ["self check output $task=check_data_leakage"],
                     "streaming": {
                         "enabled": True,
                         "chunk_size": 4,
