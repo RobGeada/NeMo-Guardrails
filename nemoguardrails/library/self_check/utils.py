@@ -77,10 +77,7 @@ def resolve_self_check_task(
             if event_task:
                 return event_task
 
-    if task and task.startswith("$"):
-        return default_task
-
-    return task or default_task
+    return default_task
 
 
 def get_self_check_llm(
