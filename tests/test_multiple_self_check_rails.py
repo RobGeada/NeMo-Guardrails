@@ -31,8 +31,6 @@ from nemoguardrails.llm.taskmanager import LLMTaskManager
 from nemoguardrails.testing.fake_model import FakeLLMModel
 from tests.utils import TestChat
 
-# --- Multiple input rails ---
-
 multi_input_config = RailsConfig.from_content(
     """
     define user express greeting
@@ -75,8 +73,8 @@ def test_multiple_input_rails_both_pass():
     chat = TestChat(
         multi_input_config,
         llm_completions=[
-            "No",  # check_harmful passes
-            "No",  # check_off_topic passes
+            "No",
+            "No",
             "  express greeting",
             '  "Hey!"',
         ],
@@ -93,7 +91,7 @@ def test_multiple_input_rails_first_blocks():
     chat = TestChat(
         multi_input_config,
         llm_completions=[
-            "Yes",  # check_harmful blocks
+            "Yes",
         ],
     )
 
@@ -109,8 +107,8 @@ def test_multiple_input_rails_second_blocks():
     chat = TestChat(
         multi_input_config,
         llm_completions=[
-            "No",  # check_harmful passes
-            "Yes",  # check_off_topic blocks
+            "No",
+            "Yes",
         ],
     )
 
@@ -120,8 +118,6 @@ def test_multiple_input_rails_second_blocks():
     assert new_message["role"] == "exception"
     assert new_message["content"]["type"] == "InputRailException"
 
-
-# --- Multiple output rails ---
 
 multi_output_config = RailsConfig.from_content(
     """
@@ -163,8 +159,8 @@ def test_multiple_output_rails_both_pass():
         llm_completions=[
             "  ask question",
             "  Here is the answer.",
-            "No",  # check_inappropriate passes
-            "No",  # check_data_leakage passes
+            "No",
+            "No",
         ],
     )
 
@@ -182,7 +178,7 @@ def test_multiple_output_rails_first_blocks():
         llm_completions=[
             "  ask question",
             '  "Some bad output"',
-            "Yes",  # check_inappropriate blocks
+            "Yes",
         ],
     )
 
@@ -200,8 +196,8 @@ def test_multiple_output_rails_second_blocks():
         llm_completions=[
             "  ask question",
             '  "Response with leaked data"',
-            "No",  # check_inappropriate passes
-            "Yes",  # check_data_leakage blocks
+            "No",
+            "Yes",
         ],
     )
 
@@ -211,8 +207,6 @@ def test_multiple_output_rails_second_blocks():
     assert new_message["role"] == "exception"
     assert new_message["content"]["type"] == "OutputRailException"
 
-
-# --- Default task (backward compatibility) ---
 
 default_task_config = RailsConfig.from_content(
     """
@@ -248,7 +242,7 @@ def test_default_task_input_still_works():
     chat = TestChat(
         default_task_config,
         llm_completions=[
-            "Yes",  # blocks
+            "Yes",
         ],
     )
 
@@ -322,10 +316,10 @@ def test_default_task_output_still_works():
     chat = TestChat(
         default_task_config,
         llm_completions=[
-            "No",  # input passes
+            "No",
             "  ask question",
             '  "Something that should be blocked"',
-            "Yes",  # output blocks
+            "Yes",
         ],
     )
 
@@ -389,8 +383,6 @@ def test_mixed_output_rails_run_custom_and_default_tasks():
     assert new_message["role"] == "exception"
     assert new_message["content"]["type"] == "OutputRailException"
 
-
-# --- Per-task LLM configuration ---
 
 per_task_input_config = RailsConfig.from_content(
     """
@@ -674,8 +666,8 @@ def test_per_task_llm_falls_back_to_main_when_not_configured():
     chat = TestChat(
         per_task_input_config,
         llm_completions=[
-            "No",  # check_harmful via main LLM
-            "No",  # check_off_topic via main LLM
+            "No",
+            "No",
             "  express greeting",
         ],
     )
@@ -685,9 +677,6 @@ def test_per_task_llm_falls_back_to_main_when_not_configured():
 
     assert new_message["role"] == "assistant"
     assert chat.llm.inference_count == 3
-
-
-# --- Model fallback chain ---
 
 
 def test_input_fallback_to_default_task_model():
