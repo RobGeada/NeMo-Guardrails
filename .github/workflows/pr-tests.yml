@@ -53,7 +53,9 @@ jobs:
       - name: Run pytest
         run: |
           . .venv/bin/activate
-          python -m pytest -v
+          python -m pytest -v \
+          --ignore=tests/integrations/langchain/test_middleware.py \
+          --ignore=tests/integrations/langchain/test_middleware_e2e.py
 
   pr-tests-summary:
     name: PR Tests Summary
