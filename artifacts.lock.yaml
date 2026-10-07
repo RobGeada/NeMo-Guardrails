@@ -2,8 +2,8 @@
 # Re-run to update: uv run --with pyyaml --with fastembed scripts/generate_model_lockfile.py
 
 # profile: opensource
-# sentence-transformers/all-MiniLM-L6-v2 commit: c9745ed1d9f207416be6d2e6f8de32d1f16199bf
-# qdrant/all-MiniLM-L6-v2-onnx commit: 5f1b8cd78bc4fb444dd171e59b18f3a3af89a079
+# sentence-transformers/all-MiniLM-L6-v2 commit: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+# qdrant/all-MiniLM-L6-v2-onnx commit: d13954661f83248295ba75c1ed411eef3b7b936e
 
 metadata:
   version: '1.0'
@@ -52,10 +52,10 @@ artifacts:
   checksum: sha256:5d5b662e421ea9fac075174bb0688ee0d9431699900b90662acd44b2a350503a
 - download_url: https://huggingface.co/qdrant/all-MiniLM-L6-v2-onnx/resolve/main/tokenizer.json
   filename: hf--qdrant--all-MiniLM-L6-v2-onnx--tokenizer.json
-  checksum: sha256:da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0
+  checksum: sha256:851ca67100d372ca3ae031a6abd168f53489eebfd7d89523f35c5c9b4d372c3c
 - download_url: https://huggingface.co/qdrant/all-MiniLM-L6-v2-onnx/resolve/main/tokenizer_config.json
   filename: hf--qdrant--all-MiniLM-L6-v2-onnx--tokenizer_config.json
-  checksum: sha256:bd2e06a5b20fd1b13ca988bedc8763d332d242381b4fbc98f8fead4524158f79
+  checksum: sha256:abda01c8c14c5151ae498aceb30db406d6b91242c394fd88d3b6fd5a63a101e6
 - download_url: https://huggingface.co/qdrant/all-MiniLM-L6-v2-onnx/resolve/main/vocab.txt
   filename: hf--qdrant--all-MiniLM-L6-v2-onnx--vocab.txt
   checksum: sha256:07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
