@@ -187,6 +187,7 @@ frozenlist==1.8.0 \
 fsspec==2026.6.0 \
     --hash=sha256:9a76dd86f01d5e2034c8192684e131d070de32d4d9d76843821351819e6ee2ef
     # via
+    #   -c dependencies/cve-constraints.txt
     #   huggingface-hub
     #   torch
     # from https://packages.redhat.com/api/pypi/public-rhai/rhoai/3.5/cpu-ubi9/simple/
