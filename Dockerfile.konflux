@@ -23,6 +23,13 @@ ENV HF_HOME=/app/.cache/huggingface \
     NLTK_DATA=/app/.cache/nltk_data \
     FASTEMBED_CACHE_PATH=/app/.cache/fastembed
 
+# uv is build tooling inherited from the base image, not a runtime dependency.
+# Remove its bundled crypto and the uvx companion (RHOAIENG-97373).
+RUN /opt/app-root/bin/python -m pip uninstall -y uv && \
+    test ! -e /opt/app-root/bin/uv && \
+    test ! -e /opt/app-root/bin/uvx
+
+
 RUN python3 -m venv /app/.venv && \
     /app/.venv/bin/pip install --no-cache-dir -r requirements.txt && \
     /app/.venv/bin/pip install --no-cache-dir -r requirements-models.txt && \
@@ -44,6 +51,12 @@ USER 0
 WORKDIR /app
 
 COPY --from=build /app /app
+
+# uv is build tooling inherited from the base image, not a runtime dependency.
+# Remove its bundled crypto and the uvx companion (RHOAIENG-97373).
+RUN /opt/app-root/bin/python -m pip uninstall -y uv && \
+    test ! -e /opt/app-root/bin/uv && \
+    test ! -e /opt/app-root/bin/uvx
 
 RUN rm -f /etc/security/namespace.conf /usr/lib64/security/pam_namespace.so || true && \
     chgrp -R 0 /app && \
