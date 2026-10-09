@@ -72,7 +72,7 @@ jobs:
       - name: Install compatible test dependencies and package
         run: |
           env -u UV_CONFIG_FILE uv pip install --python .venv/bin/python --no-sources \
-            --group test --group test_integration \
+            --group test --group test_integration 'langsmith<0.12' \
             --constraint "$RUNNER_TEMP/downstream-runtime-constraints.txt"
           uv pip install --python .venv/bin/python --no-deps -e .
           uv pip check --python .venv/bin/python
